@@ -24,6 +24,7 @@ import android.arch.lifecycle.LiveData;
 
 import java.util.List;
 
+import io.reactivex.Single;
 import retrofit2.Call;
 import retrofit2.http.GET;
 import retrofit2.http.Path;
@@ -34,7 +35,7 @@ import retrofit2.http.Query;
  */
 public interface GithubService {
     @GET("users/{login}")
-    LiveData<ApiResponse<User>> getUser(@Path("login") String login);
+    Single<ApiResponse<User>> getUser(@Path("login") String login);
 
     @GET("users/{login}/repos")
     LiveData<ApiResponse<List<Repo>>> getRepos(@Path("login") String login);

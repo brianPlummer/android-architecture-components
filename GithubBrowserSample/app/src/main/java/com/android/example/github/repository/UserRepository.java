@@ -16,59 +16,63 @@
 
 package com.android.example.github.repository;
 
-import com.android.example.github.AppExecutors;
+import android.arch.lifecycle.LiveData;
+import android.arch.lifecycle.LiveDataReactiveStreams;
+
 import com.android.example.github.api.ApiResponse;
 import com.android.example.github.api.GithubService;
 import com.android.example.github.db.UserDao;
 import com.android.example.github.vo.Resource;
+import com.android.example.github.vo.Status;
 import com.android.example.github.vo.User;
+import com.nytimes.android.external.store3.base.Persister;
+import com.nytimes.android.external.store3.base.impl.Store;
+import com.nytimes.android.external.store3.base.impl.StoreBuilder;
 
-import android.arch.lifecycle.LiveData;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-
+import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+
+import io.reactivex.Maybe;
+import io.reactivex.Single;
+import io.reactivex.functions.Function;
 
 /**
  * Repository that handles User objects.
  */
 @Singleton
 public class UserRepository {
-    private final UserDao userDao;
-    private final GithubService githubService;
-    private final AppExecutors appExecutors;
+
+    private final Store<Resource<User>, String> userStore;
 
     @Inject
-    UserRepository(AppExecutors appExecutors, UserDao userDao, GithubService githubService) {
-        this.userDao = userDao;
-        this.githubService = githubService;
-        this.appExecutors = appExecutors;
+    UserRepository(UserDao userDao, GithubService githubService) {
+
+
+        userStore = StoreBuilder.<String,User,Resource<User>>parsedWithKey()
+                .fetcher(user -> githubService.getUser(user)
+                        .map(userApiResponse -> userApiResponse.body))
+
+                .persister(new Persister<User, String>() {
+                    @Nonnull
+                    @Override
+                    public Maybe<User> read(@Nonnull String s) {
+                        return Maybe.just(userDao.findByLogin(s).getValue());
+                    }
+
+                    @Nonnull
+                    @Override
+                    public Single<Boolean> write(@Nonnull String s, @Nonnull User user) {
+                        userDao.insert(user);
+                        return Single.just(true);
+                    }
+
+                })
+                .parser(user -> new Resource<>(Status.SUCCESS,user,"huzzah"))
+                .open();
     }
 
     public LiveData<Resource<User>> loadUser(String login) {
-        return new NetworkBoundResource<User,User>(appExecutors) {
-            @Override
-            protected void saveCallResult(@NonNull User item) {
-                userDao.insert(item);
-            }
-
-            @Override
-            protected boolean shouldFetch(@Nullable User data) {
-                return data == null;
-            }
-
-            @NonNull
-            @Override
-            protected LiveData<User> loadFromDb() {
-                return userDao.findByLogin(login);
-            }
-
-            @NonNull
-            @Override
-            protected LiveData<ApiResponse<User>> createCall() {
-                return githubService.getUser(login);
-            }
-        }.asLiveData();
+        return LiveDataReactiveStreams.fromPublisher(userStore.get(login).toFlowable());
     }
 }
