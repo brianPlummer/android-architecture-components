@@ -24,11 +24,24 @@ import com.android.example.github.db.GithubDb;
 import com.android.example.github.db.RepoDao;
 import com.android.example.github.db.UserDao;
 import com.android.example.github.util.LiveDataCallAdapterFactory;
+import com.android.example.github.vo.Repo;
+import com.android.example.github.vo.Resource;
+import com.android.example.github.vo.Status;
+import com.android.example.github.vo.User;
+import com.nytimes.android.external.store3.base.Fetcher;
+import com.nytimes.android.external.store3.base.Persister;
+import com.nytimes.android.external.store3.base.impl.Store;
+import com.nytimes.android.external.store3.base.impl.StoreBuilder;
 
+import java.util.List;
+
+import javax.annotation.Nonnull;
 import javax.inject.Singleton;
 
 import dagger.Module;
 import dagger.Provides;
+import io.reactivex.Maybe;
+import io.reactivex.Single;
 import retrofit2.Retrofit;
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
 import retrofit2.converter.gson.GsonConverterFactory;
@@ -60,4 +73,72 @@ class AppModule {
     RepoDao provideRepoDao(GithubDb db) {
         return db.repoDao();
     }
+
+
+    @Singleton @Provides
+    Store<Resource<User>, String> provideUserStore(UserDao userDao, GithubService githubService) {
+
+        Store<Resource<User>, String> userStore = StoreBuilder.<String,User,Resource<User>>parsedWithKey()
+                .fetcher(user -> githubService.getUser(user)
+                        .map(userApiResponse -> userApiResponse.body))
+                .persister(new Persister<User, String>() {
+                    @Nonnull
+                    @Override
+                    public Maybe<User> read(@Nonnull String s) {
+                        User user = userDao.findByLogin(s).getValue();
+                        Maybe<User> userMaybe = Maybe.never();
+                        if (user != null) {
+                            userMaybe = Maybe.just(user);
+                        }
+                        return userMaybe;
+                    }
+
+                    @Nonnull
+                    @Override
+                    public Single<Boolean> write(@Nonnull String s, @Nonnull User user) {
+                        userDao.insert(user);
+                        return Single.just(true);
+                    }
+
+                })
+                .parser(user -> new Resource<>(Status.SUCCESS,user,"huzzah"))
+                .open();
+        return userStore;
+    }
+
+    @Singleton @Provides
+    Store<Resource<List<Repo>>, String> providesReposStore(GithubService githubService, RepoDao repoDao) {
+        Store<Resource<List<Repo>>, String> reposStore = StoreBuilder.<String,List<Repo>,Resource<List<Repo>>>parsedWithKey()
+                .fetcher(new Fetcher<List<Repo>, String>() {
+                    @Nonnull
+                    @Override
+                    public Single<List<Repo>> fetch(@Nonnull String s) {
+                        return  githubService.getRepos(s)
+                                .map(userApiResponse -> userApiResponse.body);
+                    }
+                })
+                .persister(new Persister<List<Repo>, String>() {
+                    @Nonnull
+                    @Override
+                    public Maybe<List<Repo>> read(@Nonnull String owner) {
+                        List<Repo> repos = repoDao.loadRepositories(owner).getValue();
+                        Maybe<List<Repo>> listMaybe = Maybe.never();
+                        if (repos != null && !repos.isEmpty()) {
+                            listMaybe.just(repos);
+                        }
+                        return listMaybe;
+                    }
+
+                    @Nonnull
+                    @Override
+                    public Single<Boolean> write(@Nonnull String s, @Nonnull List<Repo> repos) {
+                        repoDao.insertRepos(repos);
+                        return Single.just(true);
+                    }
+                })
+                .parser(repos -> new Resource<>(Status.SUCCESS,repos,"huzzah"))
+                .open();
+        return reposStore;
+    }
+
 }

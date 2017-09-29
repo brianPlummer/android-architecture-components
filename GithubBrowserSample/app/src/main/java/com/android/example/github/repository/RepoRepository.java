@@ -16,6 +16,11 @@
 
 package com.android.example.github.repository;
 
+import android.arch.lifecycle.LiveData;
+import android.arch.lifecycle.Transformations;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+
 import com.android.example.github.AppExecutors;
 import com.android.example.github.api.ApiResponse;
 import com.android.example.github.api.GithubService;
@@ -28,11 +33,6 @@ import com.android.example.github.vo.Contributor;
 import com.android.example.github.vo.Repo;
 import com.android.example.github.vo.RepoSearchResult;
 import com.android.example.github.vo.Resource;
-
-import android.arch.lifecycle.LiveData;
-import android.arch.lifecycle.Transformations;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -62,45 +62,17 @@ public class RepoRepository {
 
     private RateLimiter<String> repoListRateLimit = new RateLimiter<>(10, TimeUnit.MINUTES);
 
+
     @Inject
     public RepoRepository(AppExecutors appExecutors, GithubDb db, RepoDao repoDao,
-            GithubService githubService) {
+            GithubService githubService
+                          ) {
         this.db = db;
         this.repoDao = repoDao;
         this.githubService = githubService;
         this.appExecutors = appExecutors;
     }
 
-    public LiveData<Resource<List<Repo>>> loadRepos(String owner) {
-        return new NetworkBoundResource<List<Repo>, List<Repo>>(appExecutors) {
-            @Override
-            protected void saveCallResult(@NonNull List<Repo> item) {
-                repoDao.insertRepos(item);
-            }
-
-            @Override
-            protected boolean shouldFetch(@Nullable List<Repo> data) {
-                return data == null || data.isEmpty() || repoListRateLimit.shouldFetch(owner);
-            }
-
-            @NonNull
-            @Override
-            protected LiveData<List<Repo>> loadFromDb() {
-                return repoDao.loadRepositories(owner);
-            }
-
-            @NonNull
-            @Override
-            protected LiveData<ApiResponse<List<Repo>>> createCall() {
-                return githubService.getRepos(owner);
-            }
-
-            @Override
-            protected void onFetchFailed() {
-                repoListRateLimit.reset(owner);
-            }
-        }.asLiveData();
-    }
 
     public LiveData<Resource<Repo>> loadRepo(String owner, String name) {
         return new NetworkBoundResource<Repo, Repo>(appExecutors) {

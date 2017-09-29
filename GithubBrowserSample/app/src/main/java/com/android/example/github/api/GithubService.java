@@ -38,7 +38,7 @@ public interface GithubService {
     Single<ApiResponse<User>> getUser(@Path("login") String login);
 
     @GET("users/{login}/repos")
-    LiveData<ApiResponse<List<Repo>>> getRepos(@Path("login") String login);
+    Single<ApiResponse<List<Repo>>> getRepos(@Path("login") String login);
 
     @GET("repos/{owner}/{name}")
     LiveData<ApiResponse<Repo>> getRepo(@Path("owner") String owner, @Path("name") String name);

@@ -63,6 +63,8 @@ dependencies {
     implementation "com.nytimes.android:middleware3:$store_version"
     implementation "com.nytimes.android:store-kotlin3:$store_version"
     implementation "com.nytimes.android:filesystem3:$store_version"
+    implementation 'io.reactivex.rxjava2:rxandroid:2.0.1'
+
 
     implementation "com.android.support:appcompat-v7:$support_version"
     implementation "com.android.support:recyclerview-v7:$support_version"

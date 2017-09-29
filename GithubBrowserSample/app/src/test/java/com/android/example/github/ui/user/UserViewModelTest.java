@@ -57,7 +57,7 @@ public class UserViewModelTest {
     private UserViewModel userViewModel;
     private UserRepository userRepository;
     private RepoRepository repoRepository;
-
+    //FIXME
     @Before
     public void setup() {
         userRepository = mock(UserRepository.class);

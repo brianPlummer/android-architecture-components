@@ -16,23 +16,27 @@
 
 package com.android.example.github.ui.user;
 
-import com.android.example.github.repository.RepoRepository;
-import com.android.example.github.repository.UserRepository;
-import com.android.example.github.util.AbsentLiveData;
-import com.android.example.github.util.Objects;
-import com.android.example.github.vo.Repo;
-import com.android.example.github.vo.Resource;
-import com.android.example.github.vo.User;
-
 import android.arch.lifecycle.LiveData;
+import android.arch.lifecycle.LiveDataReactiveStreams;
 import android.arch.lifecycle.MutableLiveData;
 import android.arch.lifecycle.Transformations;
 import android.arch.lifecycle.ViewModel;
 import android.support.annotation.VisibleForTesting;
 
+import com.android.example.github.repository.RepoRepository;
+import com.android.example.github.util.AbsentLiveData;
+import com.android.example.github.util.Objects;
+import com.android.example.github.vo.Repo;
+import com.android.example.github.vo.Resource;
+import com.android.example.github.vo.User;
+import com.nytimes.android.external.store3.base.impl.Store;
+
 import java.util.List;
 
 import javax.inject.Inject;
+
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.schedulers.Schedulers;
 
 public class UserViewModel extends ViewModel {
     @VisibleForTesting
@@ -41,19 +45,26 @@ public class UserViewModel extends ViewModel {
     private final LiveData<Resource<User>> user;
     @SuppressWarnings("unchecked")
     @Inject
-    public UserViewModel(UserRepository userRepository, RepoRepository repoRepository) {
+    public UserViewModel(Store<Resource<User>, String> userStore,
+                         Store<Resource<List<Repo>>, String> reposStore) {
         user = Transformations.switchMap(login, login -> {
             if (login == null) {
                 return AbsentLiveData.create();
             } else {
-                return userRepository.loadUser(login);
+                return LiveDataReactiveStreams.fromPublisher(userStore.get(login)
+                        .toFlowable()
+                        .subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread()));
             }
         });
         repositories = Transformations.switchMap(login, login -> {
             if (login == null) {
                 return AbsentLiveData.create();
             } else {
-                return repoRepository.loadRepos(login);
+                return LiveDataReactiveStreams.fromPublisher(reposStore.fetch(login)
+                        .toFlowable()
+                        .subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread()));
             }
         });
     }
